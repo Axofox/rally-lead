@@ -238,7 +238,6 @@
   }
 
   function renderSchedule(c) {
-    var tzLabel = state.tz === 'utc' ? 'UTC' : 'local time';
     var ready = c.rows.filter(function (r) { return r.launch; });
     if (!c.target) {
       els.schedule.textContent = state.rallies.length
@@ -254,7 +253,6 @@
     var nameW = 0;
     sorted.forEach(function (r) { nameW = Math.max(nameW, (r.name || ('Rally ' + (r.index + 1))).length); });
     var lines = [];
-    lines.push('Rally launch times (' + tzLabel + ') — first hit ' + fmtClock(c.target) + ', ' + c.gap + 's apart');
     sorted.forEach(function (r) {
       var name = r.name || ('Rally ' + (r.index + 1));
       while (name.length < nameW) name += ' ';
