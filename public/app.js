@@ -27,6 +27,7 @@
   };
 
   var state = load() || {
+    v: 2,
     target: '',
     gap: 1,
     tz: 'utc',
@@ -47,8 +48,9 @@
       s.rallies.forEach(function (r) { if (!r.id) r.id = uid(); });
       // Game time only. A target saved while the old "Local" clock was selected
       // is in the wrong zone, so drop it rather than show a misleading time.
-      if (s.tz !== 'utc') s.target = '';
+      if (s.tz !== 'utc' || s.v !== 2) s.target = '';
       s.tz = 'utc';
+      s.v = 2;
       return s;
     } catch (e) { return null; }
   }
