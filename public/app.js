@@ -45,7 +45,10 @@
       var s = JSON.parse(raw);
       if (!s || !Array.isArray(s.rallies)) return null;
       s.rallies.forEach(function (r) { if (!r.id) r.id = uid(); });
-      s.tz = 'utc'; // game time only
+      // Game time only. A target saved while the old "Local" clock was selected
+      // is in the wrong zone, so drop it rather than show a misleading time.
+      if (s.tz !== 'utc') s.target = '';
+      s.tz = 'utc';
       return s;
     } catch (e) { return null; }
   }
