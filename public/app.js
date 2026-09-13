@@ -433,7 +433,7 @@
           return loadImage(file).then(preprocess).then(function (canvas) {
             return w.recognize(canvas);
           }).then(function (res) {
-            var found = extractTimes(res.data.text);
+            var found = extractTimes(ocrLines(res.data));
             found.forEach(function (f) { addRally(f.name, f.time); added++; });
           });
         });
@@ -491,23 +491,64 @@
     return canvas;
   }
 
-  // Pull "name + time" pairs out of OCR text. Handles 00:04:32 / 4:32 / 4m 32s,
-  // and the usual OCR slips (O for 0, l/I for 1, ; or . for :).
-  var TIME_RE = /(?:\b|^)((?:[0-9OoIl]{1,2}[:;.])?[0-9OoIl]{1,2}[:;.][0-9OoIl]{2}|\d{1,2}\s*[hH]\s*\d{1,2}\s*[mM]\s*\d{1,2}\s*[sS]?|\d{1,2}\s*[mM](?:in)?\s*\d{1,2}\s*[sS])(?=\b|$|[^0-9])/g;
-  function fixDigits(s) { return s.replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/[;.]/g, ':'); }
+  // Flatten Tesseract output to [{text, side}] where side is 'right' when the
+  // line sits in the right half of the image (own chat bubbles have no name).
+  function ocrLines(data) {
+    var width = 0, lines = [];
+    (data.blocks || []).forEach(function (b) {
+      width = Math.max(width, b.bbox.x1);
+      (b.paragraphs || []).forEach(function (p) {
+        (p.lines || []).forEach(function (l) { lines.push({ text: l.text, x0: l.bbox.x0, x1: l.bbox.x1 }); });
+      });
+    });
+    if (!lines.length) return String(data.text || '').split(/\r?\n/).map(function (t) { return { text: t, side: 'left' }; });
+    return lines.map(function (l) {
+      var mid = (l.x0 + l.x1) / 2;
+      return { text: l.text, side: width && mid > width * 0.55 && l.x0 > width * 0.3 ? 'right' : 'left' };
+    });
+  }
 
-  function extractTimes(text) {
-    var lines = text.split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
-    var parsed = lines.map(function (line) {
+  // Pull "name + time" pairs out of OCR lines. Handles 00:04:32 / 4:32 / 52 :43 /
+  // 4m 32s / 1min / 1 min 30 / 90s, a bare number on its own line (= minutes), and
+  // the usual OCR slips (O for 0, l/I for 1, ; or . for :).
+  var TIME_RE = /(?:^|[^\d:])((?:[0-9OoIl]{1,2}\s?[:;.]\s?)?[0-9OoIl]{1,2}\s?[:;.]\s?[0-9OoIl]{2}|\d{1,2}\s*h(?:ours?|rs?)?\s*(?:\d{1,2}\s*m(?:in(?:ute)?s?)?)?\s*(?:\d{1,2}\s*s(?:ec(?:ond)?s?)?)?|\d{1,2}\s*m(?:in(?:ute)?s?)?(?:\s*(?:and\s*)?\d{1,2}\s*s?(?:ec(?:ond)?s?)?)?|\d{1,3}\s*s(?:ec(?:ond)?s?)?)(?![\d:a-z])/gi;
+  var BARE_NUMBER_RE = /^\s*(\d{1,2})(?:[.,](\d))?\s*$/;
+  function fixDigits(s) { return s.replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/[;.]/g, ':').replace(/\s*:\s*/g, ':'); }
+
+  // "4m32s", "1min", "1 min 30", "90s", "1h 5m" -> seconds
+  function parseLoose(raw) {
+    var t = raw.toLowerCase().replace(/\s+/g, '');
+    if (/^[\d:]+$/.test(t)) return parseDuration(t);
+    var m = t.match(/^(?:(\d{1,2})h(?:ours?|rs?)?)?(?:(\d{1,2})m(?:in(?:ute)?s?)?)?(?:and)?(?:(\d{1,3})s?(?:ec(?:ond)?s?)?)?$/);
+    if (!m || (!m[1] && !m[2] && !m[3])) return null;
+    return (+(m[1] || 0)) * 3600 + (+(m[2] || 0)) * 60 + (+(m[3] || 0));
+  }
+
+  function extractTimes(rawLines) {
+    var parsed = rawLines.map(function (l) {
+      var line = String(l.text || '').replace(/\s+/g, ' ').trim();
+      return { line: line, side: l.side || 'left', times: [] };
+    }).filter(function (p) { return p.line; });
+
+    parsed.forEach(function (p) {
+      var line = p.line;
+      if (/\bhits?\s+at\b/i.test(line)) return; // "I should hit at 34:00" is a target, not a march
       var matches = [], m;
       TIME_RE.lastIndex = 0;
-      while ((m = TIME_RE.exec(line)) !== null) matches.push({ raw: m[1], index: m.index });
-      var times = matches.map(function (x) {
-        var norm = fixDigits(x.raw).replace(/\s+/g, '');
-        var secs = parseDuration(norm.replace(/[hH]/, 'h ').replace(/[mM]/, 'm ').replace(/[sS]$/, 's'));
-        return { raw: x.raw, index: x.index, end: x.index + x.raw.length, secs: secs };
+      while ((m = TIME_RE.exec(line)) !== null) {
+        var idx = m.index + m[0].length - m[1].length;
+        matches.push({ raw: m[1], index: idx, end: idx + m[1].length });
+      }
+      p.times = matches.map(function (x) {
+        var secs = parseLoose(fixDigits(x.raw));
+        return { raw: x.raw, index: x.index, end: x.end, secs: secs };
       }).filter(function (x) { return x.secs !== null && x.secs > 0 && x.secs < 6 * 3600; });
-      return { line: line, times: times };
+      // A bubble that is just "1" or "1.5" means minutes.
+      var bare = line.match(BARE_NUMBER_RE);
+      if (!p.times.length && bare) {
+        var secs = (+bare[1]) * 60 + (bare[2] ? Math.round((+bare[2]) * 6) : 0);
+        if (secs > 0) p.times.push({ raw: line, index: 0, end: line.length, secs: secs });
+      }
     });
 
     var out = [];
@@ -515,12 +556,11 @@
     parsed.forEach(function (p, i) {
       var line = p.line, times = p.times;
       if (!times.length) {
-        if (/\p{L}{2,}/u.test(line)) pendingName = cleanName(line);
+        if (p.side === 'left' && /\p{L}{2,}/u.test(line)) pendingName = cleanName(line);
         return;
       }
       // Chat header line: "Name        21:16" — a name followed by a clock stamp at the
       // very end, with the actual message (holding a time) on one of the next lines.
-      // Treat it as the name line and ignore the stamp.
       var last = times[times.length - 1];
       var head = cleanName(line.slice(0, last.index));
       var trailing = line.slice(last.end).trim() === '';
@@ -533,16 +573,18 @@
       times.forEach(function (v, k) {
         var before = line.slice(k === 0 ? 0 : times[k - 1].end, v.index);
         var name = cleanName(before);
-        if (name.length < 2) name = pendingName;
+        if (name.length < 2) name = p.side === 'right' ? 'You' : pendingName;
         out.push({ name: name, time: canonicalDuration(v.secs) });
       });
       pendingName = '';
     });
     return out;
   }
-  var FILLER_RE = /\b(?:my|is|are|it|its|the|a|to|at|in|on|of|for|and|march|time|times|rally|target|castle|mins?|secs?|s|m|h|hit|hits|go|ok|here)\b/gi;
+  var FILLER_RE = /\b(?:my|is|are|it|its|the|a|i|to|at|in|on|of|for|and|march|marching|time|times|rally|target|castle|mins?|minutes?|secs?|seconds?|s|m|h|hit|hits|go|ok|here|should|about|takes?|need|needs)\b/gi;
   function cleanName(s) {
-    return s.replace(/[^\p{L}\p{N} _\-'.]/gu, ' ').replace(FILLER_RE, ' ')
+    return s.replace(/\bVIP\s?\d+\b/gi, ' ')          // chat rank badge
+            .replace(/\[[^\]]{1,6}\]|\([^)]{1,6}\)/g, ' ') // alliance tag
+            .replace(/[^\p{L}\p{N} _\-'.]/gu, ' ').replace(FILLER_RE, ' ')
             .replace(/\s+/g, ' ').trim()
             .replace(/(?:\s+[\d:;.]+)+$/, '') // stray clock-stamp fragments after the name
             .trim().slice(0, 24);
