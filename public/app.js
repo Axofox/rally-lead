@@ -279,7 +279,7 @@
     b.addEventListener('click', function () {
       var t = new Date(Date.now() + (+b.dataset.plus) * 60000);
       var p = tzParts(t);
-      state.target = pad(p.h) + ':' + pad(p.m) + ':00';
+      state.target = pad(p.h) + ':' + pad(p.m) + ':' + pad(p.s);
       save(); renderControls(); renderComputed();
     });
   });
