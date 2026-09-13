@@ -252,6 +252,22 @@ input.bad { border-color: var(--bad); }
   overflow-x: auto;
 }
 
+.ocr-debug { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.ocr-debug summary { cursor: pointer; }
+.ocr-debug pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow: auto;
+}
 .warn {
   margin-top: 12px;
   padding: 10px 14px;

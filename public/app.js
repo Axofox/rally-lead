@@ -14,6 +14,8 @@
     schedule: $('schedule'),
     tableError: $('table-error'),
     tableWarn: $('table-warn'),
+    ocrDebug: $('ocr-debug'),
+    ocrRaw: $('ocr-raw'),
     dropzone: $('dropzone'),
     fileInput: $('file-input'),
     ocrStatus: $('ocr-status'),
@@ -420,7 +422,7 @@
     busy = true;
     els.btnScreenshot.disabled = true;
     els.tableError.classList.add('hidden');
-    var added = 0;
+    var added = 0, debugLines = [];
     setOcr('Loading OCR…', null);
     getWorker().then(function (w) {
       return files.reduce(function (p, file, idx) {
@@ -429,7 +431,11 @@
           return loadImage(file).then(preprocess).then(function (canvas) {
             return w.recognize(canvas);
           }).then(function (res) {
-            var found = extractTimes(ocrLines(res.data));
+            var lines = ocrLines(res.data, true);
+            debugLines = debugLines.concat(lines.map(function (l) {
+              return (l.conf < MIN_LINE_CONF ? '  (dropped) ' : l.side === 'right' ? '  [right]   ' : '  [left]    ') + Math.round(l.conf) + '%  ' + l.text.trim();
+            }));
+            var found = extractTimes(lines.filter(function (l) { return l.conf >= MIN_LINE_CONF; }));
             found.forEach(function (f) { addRally(f.name, f.time); added++; });
           });
         });
@@ -438,6 +444,8 @@
       // Drop the untouched blank starter rows once real data arrives.
       if (added) state.rallies = state.rallies.filter(function (r) { return r.name.trim() || r.march.trim(); });
       save(); renderRows(); hideOcr();
+      els.ocrRaw.textContent = debugLines.length ? debugLines.join('\n') : '(nothing recognised)';
+      els.ocrDebug.classList.remove('hidden');
       if (!added) showTableError('No times found in ' + (files.length === 1 ? 'that image' : 'those images') + '. Try a sharper screenshot, or type the times in manually.');
     }).catch(function (err) {
       hideOcr();
@@ -491,7 +499,7 @@
   // line sits in the right half of the image (own chat bubbles have no name).
   var MIN_LINE_CONF = 60;  // below this it's avatar / icon noise, not text
   var MIN_NAME_CONF = 70;  // a line must be this clean to be used as a name
-  function ocrLines(data) {
+  function ocrLines(data, keepAll) {
     var width = 0, lines = [];
     (data.blocks || []).forEach(function (b) {
       width = Math.max(width, b.bbox.x1);
@@ -503,7 +511,7 @@
     });
     if (!lines.length) return String(data.text || '').split(/\r?\n/).map(function (t) { return { text: t, side: 'left', conf: 100 }; });
     lines.sort(function (a, b) { return a.y0 - b.y0 || a.x0 - b.x0; });
-    return lines.filter(function (l) { return l.conf >= MIN_LINE_CONF; }).map(function (l) {
+    return lines.filter(function (l) { return keepAll || l.conf >= MIN_LINE_CONF; }).map(function (l) {
       var mid = (l.x0 + l.x1) / 2;
       return { text: l.text, conf: l.conf, side: width && mid > width * 0.55 && l.x0 > width * 0.3 ? 'right' : 'left' };
     });
