@@ -33,11 +33,7 @@
     target: '',
     gap: 1,
     tz: 'utc',
-    rallies: [
-      { id: uid(), name: '', march: '' },
-      { id: uid(), name: '', march: '' },
-      { id: uid(), name: '', march: '' }
-    ]
+    rallies: [{ id: uid(), name: '', march: '' }]
   };
 
   /* ---------- persistence ---------- */
@@ -87,15 +83,6 @@
     var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
     return pad(h) + ':' + pad(m) + ':' + pad(s);
   }
-  function fmtOffset(sec) {
-    sec = Math.round(sec);
-    if (sec === 0) return '+0s';
-    var sign = sec < 0 ? '−' : '+';
-    sec = Math.abs(sec);
-    var m = Math.floor(sec / 60), s = sec % 60;
-    return sign + (m ? m + 'm ' : '') + s + 's';
-  }
-
   // "20:00:00", "20:00", "200000", "2000" (in the chosen clock) -> {h,m,s} or null.
   function parseClock(str) {
     if (!str) return null;
@@ -143,18 +130,14 @@
     var gap = Math.max(0, parseInt(state.gap, 10) || 0);
     var rows = state.rallies.map(function (r, i) {
       var march = parseDuration(r.march);
-      var out = { id: r.id, index: i, name: r.name, marchText: r.march, march: march,
-                  hit: null, launch: null, offset: null };
+      var out = { id: r.id, index: i, name: r.name, marchText: r.march, march: march, hit: null, launch: null };
       if (target && march !== null) {
         out.hit = new Date(target.getTime() + i * gap * 1000);
         out.launch = new Date(out.hit.getTime() - march * 1000);
       }
       return out;
     });
-    var first = null;
-    rows.forEach(function (r) { if (r.launch && (first === null || r.launch < first)) first = r.launch; });
-    rows.forEach(function (r) { if (r.launch) r.offset = (r.launch - first) / 1000; });
-    return { target: target, gap: gap, rows: rows, firstLaunch: first };
+    return { target: target, gap: gap, rows: rows };
   }
 
   /* ---------- rendering ---------- */
@@ -169,7 +152,7 @@
     if (!state.rallies.length) {
       var tr = document.createElement('tr');
       tr.className = 'empty-row';
-      tr.innerHTML = '<td colspan="7">No rallies yet — add one or read them from a screenshot.</td>';
+      tr.innerHTML = '<td colspan="6">No rallies yet — add one or read them from a screenshot.</td>';
       els.body.appendChild(tr);
       return;
     }
@@ -182,7 +165,6 @@
         '<td class="march-cell"><input type="text" data-field="march" inputmode="numeric" autocomplete="off" spellcheck="false"></td>' +
         '<td class="col-num launch">—</td>' +
         '<td class="col-num col-hit hit">—</td>' +
-        '<td class="col-num col-offset offset">—</td>' +
         '<td class="col-tools">' +
           '<button type="button" class="icon-btn" data-act="up" title="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button> ' +
           '<button type="button" class="icon-btn" data-act="down" title="Move down"' + (i === state.rallies.length - 1 ? ' disabled' : '') + '>↓</button> ' +
@@ -209,18 +191,16 @@
 
       var launchTd = tr.querySelector('.launch');
       var hitTd = tr.querySelector('.hit');
-      var offTd = tr.querySelector('.offset');
       if (r.launch) {
         var suffix = dayKey(r.launch) !== dayKey(c.target) ? ' (−1d)' : '';
         launchTd.textContent = fmtClock(r.launch) + suffix;
         hitTd.textContent = fmtClock(r.hit);
-        offTd.textContent = fmtOffset(r.offset);
         var dt = (r.launch.getTime() - now) / 1000;
         launchTd.classList.toggle('past', dt < 0);
         launchTd.classList.toggle('soon', dt >= 0 && dt <= 60);
         launchTd.title = dt < 0 ? 'Launch time already passed' : 'Launch in ' + fmtDuration(dt);
       } else {
-        launchTd.textContent = hitTd.textContent = offTd.textContent = '—';
+        launchTd.textContent = hitTd.textContent = '—';
         launchTd.className = 'col-num launch';
         launchTd.title = '';
       }
