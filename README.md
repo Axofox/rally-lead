@@ -16,7 +16,10 @@ to press **Go** so the rallies hit back-to-back (1 s apart by default).
 2. **Rallies** – one row per rally: leader name and march time (`4:32`, `00:04:32`, `4m 32s`).
    Rallies hit in the order listed; use ↑ ↓ to reorder. Enter in the last march field adds a row.
 3. **Read from screenshot** – drop / paste / choose a screenshot (e.g. alliance chat where
-   members posted their march times). Every time it finds becomes a row — `1:00`, `52 :43`,
+   members posted their march times). For Kingshot chat it finds the cream speech bubbles by
+   colour and reads each one on its own (plus the name line above left-side bubbles), which
+   is far more reliable than OCR-ing the whole screen; other screenshots fall back to
+   whole-image OCR. Every time it finds becomes a row — `1:00`, `52 :43`,
    `00:04:32`, `1min`, `1 min 30`, `2m 15s`, `90s`, or a bubble that is just `1` (= minutes).
    The name is taken from the chat line above the bubble (rank badge and alliance tag
    stripped); your own bubbles on the right side become **You**. Lines like "hit at 34:00"

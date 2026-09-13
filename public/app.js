@@ -397,13 +397,13 @@
         if (m.status === 'recognizing text') setOcr('Reading image…', m.progress);
         else if (m.status) setOcr(prettyStatus(m.status), typeof m.progress === 'number' ? m.progress : null);
       }
-    }).then(function (w) {
-      // "Sparse text" mode: chat bubbles, names and avatars are scattered
-      // blocks, not a page of prose. It also keeps avatar noise in its own
-      // low-confidence lines instead of merging it into the names.
-      return w.setParameters({ tessedit_pageseg_mode: '11' }).then(function () { worker = w; return w; });
-    }, function (err) { workerPromise = null; throw err; });
+    }).then(function (w) { worker = w; return w; }, function (err) { workerPromise = null; throw err; });
     return workerPromise;
+  }
+  var currentPsm = null;
+  function withPsm(w, psm) {
+    if (currentPsm === psm) return Promise.resolve(w);
+    return w.setParameters({ tessedit_pageseg_mode: String(psm) }).then(function () { currentPsm = psm; return w; });
   }
   function prettyStatus(s) {
     return { 'loading tesseract core': 'Loading OCR engine…', 'initializing tesseract': 'Starting OCR engine…',
@@ -428,14 +428,13 @@
       return files.reduce(function (p, file, idx) {
         return p.then(function () {
           setOcr('Reading image ' + (idx + 1) + ' of ' + files.length + '…', 0);
-          return loadImage(file).then(preprocess).then(function (canvas) {
-            return w.recognize(canvas);
-          }).then(function (res) {
-            var lines = ocrLines(res.data, true);
-            debugLines = debugLines.concat(lines.map(function (l) {
-              return (l.conf < MIN_LINE_CONF ? '  (dropped) ' : l.side === 'right' ? '  [right]   ' : '  [left]    ') + Math.round(l.conf) + '%  ' + l.text.trim();
-            }));
-            var found = extractTimes(lines.filter(function (l) { return l.conf >= MIN_LINE_CONF; }));
+          return loadImage(file).then(function (img) {
+            var bubbles = findBubbles(img);
+            if (bubbles.length) return readBubbles(w, img, bubbles);
+            return readWholeImage(w, img);
+          }).then(function (r) {
+            debugLines = debugLines.concat(r.debug);
+            var found = extractTimes(r.lines);
             found.forEach(function (f) { addRally(f.name, f.time); added++; });
           });
         });
@@ -464,39 +463,115 @@
     });
   }
 
-  // Upscale small screenshots and convert to high-contrast greyscale — Tesseract
-  // reads game chat far better this way than from the raw dark UI.
-  function preprocess(img) {
-    var scale = Math.min(3, Math.max(1, 1800 / img.naturalWidth));
-    var w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
-    var canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    var ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, w, h);
-    var data = ctx.getImageData(0, 0, w, h), px = data.data;
-    var sum = 0, n = px.length / 4;
-    for (var i = 0; i < px.length; i += 4) {
-      var g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-      px[i] = px[i + 1] = px[i + 2] = g;
-      sum += g;
+  /* ---- Kingshot chat: find the cream speech bubbles and OCR each one ---- */
+
+  // Cream bubbles on the beige chat background. Returns [{x0,y0,x1,y1,w,h}] top to bottom.
+  function findBubbles(img) {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var step = Math.max(1, Math.round(w / 400));            // ~400px-wide grid is plenty
+    var gw = Math.floor(w / step), gh = Math.floor(h / step);
+    var c = document.createElement('canvas'); c.width = gw; c.height = gh;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, gw, gh);
+    var px = ctx.getImageData(0, 0, gw, gh).data;
+    var mask = new Uint8Array(gw * gh);
+    for (var p = 0; p < gw * gh; p++) {
+      var r = px[p * 4], g = px[p * 4 + 1], b = px[p * 4 + 2];
+      var mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+      mask[p] = (mn > 224 && r > 240 && mx - mn < 40) ? 1 : 0;
     }
-    // Dark UI → invert so text is dark on light, which Tesseract prefers.
-    var invert = sum / n < 128;
-    for (var j = 0; j < px.length; j += 4) {
-      var v = invert ? 255 - px[j] : px[j];
-      v = ((v - 128) * 1.4) + 128; // mild contrast boost
-      v = v < 0 ? 0 : v > 255 ? 255 : v;
-      px[j] = px[j + 1] = px[j + 2] = v;
-      px[j + 3] = 255;
+    var label = new Int32Array(gw * gh); for (var i = 0; i < label.length; i++) label[i] = -1;
+    var comps = [], stack = [];
+    for (var q = 0; q < gw * gh; q++) {
+      if (!mask[q] || label[q] >= 0) continue;
+      var id = comps.length, comp = { x0: gw, y0: gh, x1: 0, y1: 0, area: 0 };
+      comps.push(comp); stack.push(q); label[q] = id;
+      while (stack.length) {
+        var cur = stack.pop(), x = cur % gw, y = (cur / gw) | 0;
+        comp.area++;
+        if (x < comp.x0) comp.x0 = x; if (x > comp.x1) comp.x1 = x;
+        if (y < comp.y0) comp.y0 = y; if (y > comp.y1) comp.y1 = y;
+        var nb = [cur + 1, cur - 1, cur + gw, cur - gw];
+        for (var k = 0; k < 4; k++) {
+          var n = nb[k];
+          if (n < 0 || n >= gw * gh) continue;
+          if ((k === 0 && x === gw - 1) || (k === 1 && x === 0)) continue;
+          if (mask[n] && label[n] < 0) { label[n] = id; stack.push(n); }
+        }
+      }
     }
-    ctx.putImageData(data, 0, 0);
-    return canvas;
+    return comps.map(function (cc) {
+      var o = { x0: cc.x0 * step, y0: cc.y0 * step, x1: (cc.x1 + 1) * step, y1: (cc.y1 + 1) * step, area: cc.area * step * step };
+      o.w = o.x1 - o.x0; o.h = o.y1 - o.y0; return o;
+    }).filter(function (o) {
+      var ar = o.w / o.h, fill = o.area / (o.w * o.h);
+      return o.w >= w * 0.08 && o.h >= w * 0.035 && ar >= 1 && ar <= 10 && fill >= 0.75;
+    }).sort(function (a, b) { return a.y0 - b.y0; });
   }
 
-  // Flatten Tesseract output to [{text, side}] where side is 'right' when the
-  // line sits in the right half of the image (own chat bubbles have no name).
+  // Greyscale crop of the image, upscaled by `scale`, with a contrast boost.
+  function cropGrey(img, x0, y0, x1, y1, scale, contrast) {
+    x0 = Math.max(0, Math.round(x0)); y0 = Math.max(0, Math.round(y0));
+    x1 = Math.min(img.naturalWidth, Math.round(x1)); y1 = Math.min(img.naturalHeight, Math.round(y1));
+    var cw = Math.max(1, x1 - x0), ch = Math.max(1, y1 - y0);
+    var c = document.createElement('canvas');
+    c.width = Math.round(cw * scale); c.height = Math.round(ch * scale);
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, x0, y0, cw, ch, 0, 0, c.width, c.height);
+    var d = ctx.getImageData(0, 0, c.width, c.height), px = d.data;
+    for (var i = 0; i < px.length; i += 4) {
+      var v = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      v = (v - 128) * contrast + 128;
+      px[i] = px[i + 1] = px[i + 2] = v < 0 ? 0 : v > 255 ? 255 : v; px[i + 3] = 255;
+    }
+    ctx.putImageData(d, 0, 0);
+    return c;
+  }
+
+  function readBubbles(w, img, bubbles) {
+    var W = img.naturalWidth;
+    var lines = [], debug = ['Found ' + bubbles.length + ' chat bubble' + (bubbles.length === 1 ? '' : 's')];
+    return withPsm(w, 7).then(function () {
+      return bubbles.reduce(function (p, b, i) {
+        return p.then(function () {
+          setOcr('Reading bubble ' + (i + 1) + ' of ' + bubbles.length + '…', (i + 1) / bubbles.length);
+          var side = (b.x0 + b.x1) / 2 > W * 0.55 ? 'right' : 'left';
+          var inset = b.h * 0.12;
+          var text = w.recognize(cropGrey(img, b.x0 + inset, b.y0 + inset, b.x1 - inset, b.y1 - inset, Math.max(1, 90 / b.h), 1.3));
+          var name = side === 'left'
+            ? w.recognize(cropGrey(img, b.x0, b.y0 - W * 0.06, b.x0 + W * 0.45, b.y0 - W * 0.018, 2.5, 1.6))
+            : Promise.resolve(null);
+          return Promise.all([text, name]).then(function (r) {
+            var t = r[0].data.text.trim();
+            if (r[1]) {
+              var n = r[1].data.text.trim();
+              debug.push('  name    ' + Math.round(r[1].data.confidence) + '%  ' + n + '  → ' + cleanName(n));
+              if (n) lines.push({ text: n, side: 'left', conf: 100 });
+            }
+            debug.push('  [' + side + ']  ' + Math.round(r[0].data.confidence) + '%  ' + t);
+            if (t) lines.push({ text: t, side: side, conf: 100 });
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () { return { lines: lines, debug: debug }; });
+  }
+
+  // Fallback for screenshots that aren't Kingshot chat: OCR the whole image
+  // in "sparse text" mode and keep only confident lines.
+  function readWholeImage(w, img) {
+    var scale = Math.min(3, Math.max(1, 1800 / img.naturalWidth));
+    var canvas = cropGrey(img, 0, 0, img.naturalWidth, img.naturalHeight, scale, 1.4);
+    return withPsm(w, 11).then(function () { return w.recognize(canvas); }).then(function (res) {
+      var all = ocrLines(res.data, true);
+      var debug = ['No chat bubbles found, read the whole image'].concat(all.map(function (l) {
+        return (l.conf < MIN_LINE_CONF ? '  (dropped) ' : l.side === 'right' ? '  [right]   ' : '  [left]    ') + Math.round(l.conf) + '%  ' + l.text.trim();
+      }));
+      return { lines: all.filter(function (l) { return l.conf >= MIN_LINE_CONF; }), debug: debug };
+    });
+  }
+
   var MIN_LINE_CONF = 60;  // below this it's avatar / icon noise, not text
   var MIN_NAME_CONF = 70;  // a line must be this clean to be used as a name
   function ocrLines(data, keepAll) {
@@ -593,8 +668,10 @@
   }
   var FILLER_RE = /\b(?:my|is|are|it|its|the|a|i|im|to|at|in|on|of|for|and|march|marching|time|times|rally|target|castle|mins?|minutes?|secs?|seconds?|s|m|h|hit|hits|go|ok|here|should|about|takes?|need|needs|this|that|mine|me|yours|you|one|have|got|be|will|would|can|from|with|so|now|tonight|ready)\b/gi;
   function cleanName(s) {
-    return s.replace(/\bVIP\s?\d+\b/gi, ' ')          // chat rank badge
-            .replace(/\[[^\]]{1,6}\]|\([^)]{1,6}\)/g, ' ') // alliance tag
+    return s.replace(/^\s*V[Il1]P\S*\s*/i, ' ')        // "VIP8" rank badge (often misread as VIPS / V1P8)
+            .replace(/\bVIP\s?\d+\b/gi, ' ')
+            .replace(/[\[({][A-Za-z0-9]{2,5}[\])}JIl1|]/g, ' ') // "[AWU]" alliance tag, closing bracket may be misread
+            .replace(/\[[^\]]{1,6}\]|\([^)]{1,6}\)/g, ' ')
             .replace(/[^\p{L}\p{N} _\-'.]/gu, ' ').replace(FILLER_RE, ' ')
             .replace(/\s+/g, ' ').trim()
             .replace(/(?:\s+[\d:;.]+)+$/, '') // stray clock-stamp fragments after the name

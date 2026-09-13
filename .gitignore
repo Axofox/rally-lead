@@ -2,3 +2,9 @@ node_modules/
 .netlify/
 .env
 .DS_Store
+
+# sample screenshots for OCR tuning, not for publishing
+/chat.*
+/*.jpg
+/*.jpeg
+/*.png
