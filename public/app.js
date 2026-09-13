@@ -258,7 +258,7 @@
     sorted.forEach(function (r) {
       var name = r.name || ('Rally ' + (r.index + 1));
       var suffix = dayKey(r.launch) !== dayKey(c.target) ? ' (−1d)' : '';
-      lines.push(fmtClock(r.launch) + suffix + '  ' + name);
+      lines.push(name + '  ' + fmtClock(r.launch) + suffix);
     });
     els.schedule.textContent = lines.join('\n');
   }
