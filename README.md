@@ -7,11 +7,11 @@ to press **Go** so the rallies hit back-to-back (1 s apart by default).
 - Static site, no build step, served from `public/`
 - Everything runs in the browser; nothing is uploaded and there is no backend
 - Screenshot reading uses [Tesseract.js](https://github.com/naptha/tesseract.js) (loaded from cdnjs)
-- Rows, target time and clock choice are remembered in the browser (localStorage)
+- Rows and target time are remembered in the browser (localStorage)
 
 ## Using it
 
-1. **First rally hits at** – the time (UTC by default, or switch to Local) the first rally
+1. **First rally hits at** – the UTC time the first rally
    should land. The quick-set chips fill in "now + N minutes".
 2. **Rallies** – one row per rally: leader name and march time (`4:32`, `00:04:32`, `4m 32s`).
    Rallies hit in the order listed; use ↑ ↓ to reorder. Enter in the last march field adds a row.

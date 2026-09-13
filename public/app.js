@@ -10,7 +10,6 @@
     clock: $('clock'),
     target: $('target-time'),
     gap: $('gap'),
-    tzToggle: $('tz-toggle'),
     body: $('rally-body'),
     schedule: $('schedule'),
     tableError: $('table-error'),
@@ -46,6 +45,7 @@
       var s = JSON.parse(raw);
       if (!s || !Array.isArray(s.rallies)) return null;
       s.rallies.forEach(function (r) { if (!r.id) r.id = uid(); });
+      s.tz = 'utc'; // game time only
       return s;
     } catch (e) { return null; }
   }
@@ -155,9 +155,6 @@
   function renderControls() {
     els.target.value = state.target;
     els.gap.value = state.gap;
-    Array.prototype.forEach.call(els.tzToggle.querySelectorAll('button'), function (b) {
-      b.classList.toggle('active', b.dataset.tz === state.tz);
-    });
   }
 
   function renderRows() {
@@ -270,11 +267,6 @@
     if (c) { state.target = pad(c.h) + ':' + pad(c.m) + ':' + pad(c.s); els.target.value = state.target; save(); renderComputed(); }
   });
   els.gap.addEventListener('input', function () { state.gap = Math.max(0, parseInt(els.gap.value, 10) || 0); save(); renderComputed(); });
-  els.tzToggle.addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-tz]');
-    if (!b) return;
-    state.tz = b.dataset.tz; save(); renderControls(); renderComputed();
-  });
   document.querySelectorAll('.chip[data-plus]').forEach(function (b) {
     b.addEventListener('click', function () {
       var t = new Date(Date.now() + (+b.dataset.plus) * 60000);
@@ -347,7 +339,7 @@
   /* ---------- clock ---------- */
   function tick() {
     var now = new Date();
-    els.clock.textContent = fmtClock(now) + ' ' + (state.tz === 'utc' ? 'UTC' : 'local');
+    els.clock.textContent = fmtClock(now) + ' UTC';
     // Only the coloured "past / soon" flags depend on the clock; refresh them cheaply.
     var c = compute();
     c.rows.forEach(function (r) {
