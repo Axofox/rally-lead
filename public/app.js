@@ -395,7 +395,12 @@
         if (m.status === 'recognizing text') setOcr('Reading image…', m.progress);
         else if (m.status) setOcr(prettyStatus(m.status), typeof m.progress === 'number' ? m.progress : null);
       }
-    }).then(function (w) { worker = w; return w; }, function (err) { workerPromise = null; throw err; });
+    }).then(function (w) {
+      // "Sparse text" mode: chat bubbles, names and avatars are scattered
+      // blocks, not a page of prose. It also keeps avatar noise in its own
+      // low-confidence lines instead of merging it into the names.
+      return w.setParameters({ tessedit_pageseg_mode: '11' }).then(function () { worker = w; return w; });
+    }, function (err) { workerPromise = null; throw err; });
     return workerPromise;
   }
   function prettyStatus(s) {
@@ -484,18 +489,23 @@
 
   // Flatten Tesseract output to [{text, side}] where side is 'right' when the
   // line sits in the right half of the image (own chat bubbles have no name).
+  var MIN_LINE_CONF = 60;  // below this it's avatar / icon noise, not text
+  var MIN_NAME_CONF = 70;  // a line must be this clean to be used as a name
   function ocrLines(data) {
     var width = 0, lines = [];
     (data.blocks || []).forEach(function (b) {
       width = Math.max(width, b.bbox.x1);
       (b.paragraphs || []).forEach(function (p) {
-        (p.lines || []).forEach(function (l) { lines.push({ text: l.text, x0: l.bbox.x0, x1: l.bbox.x1 }); });
+        (p.lines || []).forEach(function (l) {
+          lines.push({ text: l.text, x0: l.bbox.x0, x1: l.bbox.x1, y0: l.bbox.y0, conf: l.confidence });
+        });
       });
     });
-    if (!lines.length) return String(data.text || '').split(/\r?\n/).map(function (t) { return { text: t, side: 'left' }; });
-    return lines.map(function (l) {
+    if (!lines.length) return String(data.text || '').split(/\r?\n/).map(function (t) { return { text: t, side: 'left', conf: 100 }; });
+    lines.sort(function (a, b) { return a.y0 - b.y0 || a.x0 - b.x0; });
+    return lines.filter(function (l) { return l.conf >= MIN_LINE_CONF; }).map(function (l) {
       var mid = (l.x0 + l.x1) / 2;
-      return { text: l.text, side: width && mid > width * 0.55 && l.x0 > width * 0.3 ? 'right' : 'left' };
+      return { text: l.text, conf: l.conf, side: width && mid > width * 0.55 && l.x0 > width * 0.3 ? 'right' : 'left' };
     });
   }
 
@@ -518,7 +528,7 @@
   function extractTimes(rawLines) {
     var parsed = rawLines.map(function (l) {
       var line = String(l.text || '').replace(/\s+/g, ' ').trim();
-      return { line: line, side: l.side || 'left', times: [] };
+      return { line: line, side: l.side || 'left', conf: l.conf === undefined ? 100 : l.conf, times: [] };
     }).filter(function (p) { return p.line; });
 
     parsed.forEach(function (p) {
@@ -547,7 +557,7 @@
     parsed.forEach(function (p, i) {
       var line = p.line, times = p.times;
       if (!times.length) {
-        if (p.side === 'left' && /\p{L}{2,}/u.test(line)) pendingName = cleanName(line);
+        if (p.side === 'left' && p.conf >= MIN_NAME_CONF && /\p{L}{2,}/u.test(line)) pendingName = cleanName(line);
         return;
       }
       // Chat header line: "Name        21:16" — a name followed by a clock stamp at the
