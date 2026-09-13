@@ -175,7 +175,7 @@
       tr.innerHTML =
         '<td class="col-order">' + (i + 1) + '</td>' +
         '<td class="name-cell"><input type="text" data-field="name" placeholder="Leader ' + (i + 1) + '" autocomplete="off" spellcheck="false"></td>' +
-        '<td class="march-cell"><input type="text" data-field="march" placeholder="mm:ss" inputmode="numeric" autocomplete="off" spellcheck="false"></td>' +
+        '<td class="march-cell"><input type="text" data-field="march" inputmode="numeric" autocomplete="off" spellcheck="false"></td>' +
         '<td class="col-num launch">—</td>' +
         '<td class="col-num hit">—</td>' +
         '<td class="col-num offset">—</td>' +
