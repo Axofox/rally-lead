@@ -571,16 +571,18 @@
         return;
       }
       times.forEach(function (v, k) {
-        var before = line.slice(k === 0 ? 0 : times[k - 1].end, v.index);
-        var name = cleanName(before);
-        if (name.length < 2) name = p.side === 'right' ? 'You' : pendingName;
+        var before = cleanName(line.slice(k === 0 ? 0 : times[k - 1].end, v.index));
+        var name;
+        if (p.side === 'right') name = 'You';                     // own bubble
+        else if (pendingName && before.split(' ').length > 1) name = pendingName; // "this is mine 1:00" under a name line
+        else name = before.length >= 2 ? before : pendingName;   // "Alice 4:32" list style
         out.push({ name: name, time: canonicalDuration(v.secs) });
       });
       pendingName = '';
     });
     return out;
   }
-  var FILLER_RE = /\b(?:my|is|are|it|its|the|a|i|to|at|in|on|of|for|and|march|marching|time|times|rally|target|castle|mins?|minutes?|secs?|seconds?|s|m|h|hit|hits|go|ok|here|should|about|takes?|need|needs)\b/gi;
+  var FILLER_RE = /\b(?:my|is|are|it|its|the|a|i|im|to|at|in|on|of|for|and|march|marching|time|times|rally|target|castle|mins?|minutes?|secs?|seconds?|s|m|h|hit|hits|go|ok|here|should|about|takes?|need|needs|this|that|mine|me|yours|you|one|have|got|be|will|would|can|from|with|so|now|tonight|ready)\b/gi;
   function cleanName(s) {
     return s.replace(/\bVIP\s?\d+\b/gi, ' ')          // chat rank badge
             .replace(/\[[^\]]{1,6}\]|\([^)]{1,6}\)/g, ' ') // alliance tag
