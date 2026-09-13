@@ -257,14 +257,11 @@
       return;
     }
     var sorted = ready.slice().sort(function (a, b) { return a.launch - b.launch; });
-    var nameW = 0;
-    sorted.forEach(function (r) { nameW = Math.max(nameW, (r.name || ('Rally ' + (r.index + 1))).length); });
     var lines = [];
     sorted.forEach(function (r) {
       var name = r.name || ('Rally ' + (r.index + 1));
-      while (name.length < nameW) name += ' ';
       var suffix = dayKey(r.launch) !== dayKey(c.target) ? ' (−1d)' : '';
-      lines.push(fmtClock(r.launch) + suffix + '  ' + name + '  march ' + canonicalDuration(r.march) + '  → hits ' + fmtClock(r.hit));
+      lines.push(fmtClock(r.launch) + suffix + '  ' + name);
     });
     els.schedule.textContent = lines.join('\n');
   }
