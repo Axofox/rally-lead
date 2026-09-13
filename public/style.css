@@ -248,7 +248,7 @@ input.bad { border-color: var(--bad); }
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13.5px;
   line-height: 1.6;
-  white-space: pre-wrap;
+  white-space: pre;
   overflow-x: auto;
 }
 
@@ -275,4 +275,15 @@ input.bad { border-color: var(--bad); }
 @media (max-width: 520px) {
   main { padding: 24px 14px 60px; }
   .card { padding: 14px 12px; }
+  /* Hits and offset are in the schedule below; drop them so the row fits without scrolling. */
+  .rally-table .col-hit, .rally-table .col-offset, .rally-table .col-order { display: none; }
+  .rally-table th, .rally-table td { padding: 6px 4px; }
+  .rally-table td.name-cell { min-width: 0; }
+  .rally-table .col-march, .rally-table td.march-cell { width: 58px; }
+  .rally-table td.march-cell input { padding: 6px 5px; }
+  .rally-table td.name-cell { width: auto; }
+  .wide-only { display: none; }
+  .rally-table .col-tools { width: 84px; }
+  .icon-btn { width: 26px; height: 26px; }
+  .schedule { font-size: 12.5px; }
 }

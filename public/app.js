@@ -184,8 +184,8 @@
         '<td class="name-cell"><input type="text" data-field="name" placeholder="Leader ' + (i + 1) + '" autocomplete="off" spellcheck="false"></td>' +
         '<td class="march-cell"><input type="text" data-field="march" inputmode="numeric" autocomplete="off" spellcheck="false"></td>' +
         '<td class="col-num launch">—</td>' +
-        '<td class="col-num hit">—</td>' +
-        '<td class="col-num offset">—</td>' +
+        '<td class="col-num col-hit hit">—</td>' +
+        '<td class="col-num col-offset offset">—</td>' +
         '<td class="col-tools">' +
           '<button type="button" class="icon-btn" data-act="up" title="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button> ' +
           '<button type="button" class="icon-btn" data-act="down" title="Move down"' + (i === state.rallies.length - 1 ? ' disabled' : '') + '>↓</button> ' +
@@ -264,7 +264,7 @@
       var name = r.name || ('Rally ' + (r.index + 1));
       while (name.length < nameW) name += ' ';
       var suffix = dayKey(r.launch) !== dayKey(c.target) ? ' (−1d)' : '';
-      lines.push(fmtClock(r.launch) + suffix + '  ' + name + '  march ' + fmtDuration(r.march) + '  → hits ' + fmtClock(r.hit));
+      lines.push(fmtClock(r.launch) + suffix + '  ' + name + '  march ' + canonicalDuration(r.march) + '  → hits ' + fmtClock(r.hit));
     });
     els.schedule.textContent = lines.join('\n');
   }
