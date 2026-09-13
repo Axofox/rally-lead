@@ -13,6 +13,8 @@ to press **Go** so the rallies hit back-to-back (1 s apart by default).
 
 1. **First rally hits at** – the UTC time the first rally
    should land. The quick-set chips fill in "now + N minutes".
+   **Rally countdown** is the gathering time every leader picks when starting the rally
+   (5 min by default) — it is the same for all rallies and is subtracted from the launch time.
 2. **Rallies** – one row per rally: leader name and march time (`4:32`, `00:04:32`, `4m 32s`).
    Rallies hit in the order listed; use ↑ ↓ to reorder. Enter in the last march field adds a row.
 3. **Read from screenshot** – drop / paste / choose a screenshot (e.g. alliance chat where
@@ -23,7 +25,7 @@ to press **Go** so the rallies hit back-to-back (1 s apart by default).
    already passed (pick a later target), yellow when it is less than a minute away.
 5. **Copy for chat** copies the schedule, sorted by launch time, as plain text.
 
-Math: `hit_i = target + i × gap`, `launch_i = hit_i − march_i`.
+Math: `hit_i = target + i × gap`, `launch_i = hit_i − rally countdown − march_i`.
 
 ## Run locally
 

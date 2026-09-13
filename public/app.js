@@ -10,6 +10,7 @@
     clock: $('clock'),
     target: $('target-time'),
     gap: $('gap'),
+    prep: $('prep'),
     body: $('rally-body'),
     schedule: $('schedule'),
     tableError: $('table-error'),
@@ -29,6 +30,7 @@
   var state = load() || {
     v: 2,
     target: '',
+    prep: 5,
     gap: 1,
     tz: 'utc',
     rallies: [
@@ -51,6 +53,7 @@
       if (s.tz !== 'utc' || s.v !== 2) s.target = '';
       s.tz = 'utc';
       s.v = 2;
+      if (typeof s.prep !== 'number') s.prep = 5;
       return s;
     } catch (e) { return null; }
   }
@@ -139,20 +142,21 @@
   function compute() {
     var target = targetDate();
     var gap = Math.max(0, parseInt(state.gap, 10) || 0);
+    var prep = Math.max(0, parseInt(state.prep, 10) || 0) * 60;
     var rows = state.rallies.map(function (r, i) {
       var march = parseDuration(r.march);
       var out = { id: r.id, index: i, name: r.name, marchText: r.march, march: march,
                   hit: null, launch: null, offset: null };
       if (target && march !== null) {
         out.hit = new Date(target.getTime() + i * gap * 1000);
-        out.launch = new Date(out.hit.getTime() - march * 1000);
+        out.launch = new Date(out.hit.getTime() - (prep + march) * 1000);
       }
       return out;
     });
     var first = null;
     rows.forEach(function (r) { if (r.launch && (first === null || r.launch < first)) first = r.launch; });
     rows.forEach(function (r) { if (r.launch) r.offset = (r.launch - first) / 1000; });
-    return { target: target, gap: gap, rows: rows, firstLaunch: first };
+    return { target: target, gap: gap, prep: prep, rows: rows, firstLaunch: first };
   }
 
   /* ---------- rendering ---------- */
@@ -160,6 +164,7 @@
   function renderControls() {
     els.target.value = state.target;
     els.gap.value = state.gap;
+    els.prep.value = state.prep;
   }
 
   function renderRows() {
@@ -236,7 +241,7 @@
     if (!late.length) return;
     var names = late.map(function (r) { return r.name || ('Rally ' + (r.index + 1)); });
     els.tableWarn.textContent = (names.length === 1 ? names[0] + ' would have had to launch already' : names.join(', ') + ' would have had to launch already') +
-      ' — pick a later target time (the longest march needs at least ' + fmtDuration(Math.max.apply(null, late.map(function (r) { return r.march; }))) + ').';
+      ' — pick a later target time (the longest march needs at least ' + fmtDuration(c.prep + Math.max.apply(null, late.map(function (r) { return r.march; }))) + ' incl. the rally countdown).';
   }
 
   function renderSchedule(c) {
@@ -271,6 +276,7 @@
     var c = parseClock(state.target);
     if (c) { state.target = pad(c.h) + ':' + pad(c.m) + ':' + pad(c.s); els.target.value = state.target; save(); renderComputed(); }
   });
+  els.prep.addEventListener('input', function () { state.prep = Math.max(0, parseInt(els.prep.value, 10) || 0); save(); renderComputed(); });
   els.gap.addEventListener('input', function () { state.gap = Math.max(0, parseInt(els.gap.value, 10) || 0); save(); renderComputed(); });
   document.querySelectorAll('.chip[data-plus]').forEach(function (b) {
     b.addEventListener('click', function () {

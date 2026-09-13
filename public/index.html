@@ -26,6 +26,13 @@
         <input type="text" id="target-time" inputmode="numeric" placeholder="HH:MM:SS" autocomplete="off" spellcheck="false">
       </label>
       <label class="field field-narrow">
+        <span>Rally countdown</span>
+        <span class="unit-field">
+          <input type="number" id="prep" min="0" step="1" value="5">
+          <span class="unit">min</span>
+        </span>
+      </label>
+      <label class="field field-narrow">
         <span>Gap between hits</span>
         <span class="unit-field">
           <input type="number" id="gap" min="0" step="1" value="1">
@@ -82,7 +89,7 @@
         <tbody id="rally-body"></tbody>
       </table>
     </div>
-    <p class="hint">Rallies hit in the order listed, from the top. Use the arrows to reorder. <b>Launch at</b> is the second the leader presses Go on the rally. <b>Offset</b> is the delay after the first launch.</p>
+    <p class="hint">Rallies hit in the order listed, from the top. Use the arrows to reorder. <b>Launch at</b> is the second the leader starts the rally (rally countdown + march before the hit). <b>Offset</b> is the delay after the first launch.</p>
     <div id="table-warn" class="warn hidden"></div>
     <div id="table-error" class="error hidden"></div>
   </section>
