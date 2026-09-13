@@ -39,8 +39,12 @@ npx -y serve -l 8765 public
 ## Deploy
 
 ```bash
-npx netlify deploy --prod
+./deploy.sh
 ```
+
+This stamps a build version into `index.html` (shown in the page footer and used to
+cache-bust `app.js` / `style.css`) and runs `netlify deploy --prod`. If a phone shows an
+old footer version after a deploy, close the tab completely and reopen it.
 
 No environment variables are needed — the site has no write endpoints, so there is no
 `ADMIN_TOKEN` gate.
