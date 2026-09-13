@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Rally timing</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Rally timing</h1>
+    <span class="clock" id="clock" title="Current time">--:--:--</span>
+  </div>
+  <p class="hint">
+    Enter each rally's march time, pick when the first rally should land, and get the exact
+    second every leader has to press <b>Go</b> so the rallies hit back-to-back.
+  </p>
+
+  <section class="card">
+    <h2>Target</h2>
+    <div class="fields">
+      <label class="field">
+        <span>First rally hits at</span>
+        <input type="text" id="target-time" inputmode="numeric" placeholder="HH:MM:SS" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field field-narrow">
+        <span>Gap between hits</span>
+        <span class="unit-field">
+          <input type="number" id="gap" min="0" step="1" value="1">
+          <span class="unit">s</span>
+        </span>
+      </label>
+      <div class="field field-narrow">
+        <span>Clock</span>
+        <div class="segmented" id="tz-toggle">
+          <button type="button" data-tz="utc" class="active">UTC</button>
+          <button type="button" data-tz="local">Local</button>
+        </div>
+      </div>
+    </div>
+    <div class="quick-row">
+      <span class="hint">Quick set:</span>
+      <button type="button" class="chip" data-plus="2">now + 2 min</button>
+      <button type="button" class="chip" data-plus="5">now + 5 min</button>
+      <button type="button" class="chip" data-plus="10">now + 10 min</button>
+      <button type="button" class="chip" data-plus="15">now + 15 min</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Rallies</h2>
+      <div class="card-actions">
+        <button type="button" class="chip" id="btn-screenshot">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 16.5 9 12l3 3 3.5-3.5L19.5 16"/></svg>
+          Read from screenshot
+        </button>
+        <button type="button" class="chip" id="btn-add">+ Add rally</button>
+        <button type="button" class="chip chip-quiet" id="btn-clear">Clear</button>
+      </div>
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+    </div>
+
+    <div id="dropzone" class="dropzone">
+      <p>Drop a screenshot here, paste one from your clipboard (<kbd>⌘V</kbd> / <kbd>Ctrl+V</kbd>),
+      or <button type="button" class="link-btn" id="btn-browse">choose a file</button>.</p>
+      <p class="hint">Every time like <code>00:04:32</code>, <code>4:32</code> or <code>4m 32s</code> found in the image becomes a rally row. Reading happens in your browser, nothing is uploaded.</p>
+    </div>
+    <div id="ocr-status" class="ocr-status hidden">
+      <div class="progress"><div class="progress-bar" id="ocr-bar"></div></div>
+      <span id="ocr-text">Loading OCR…</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="rally-table" id="rally-table">
+        <thead>
+          <tr>
+            <th class="col-order">#</th>
+            <th>Leader</th>
+            <th>March time</th>
+            <th class="col-num">Launch at</th>
+            <th class="col-num">Hits at</th>
+            <th class="col-num">Offset</th>
+            <th class="col-tools"></th>
+          </tr>
+        </thead>
+        <tbody id="rally-body"></tbody>
+      </table>
+    </div>
+    <p class="hint">Rallies hit in the order listed, from the top. Use the arrows to reorder. <b>Launch at</b> is the second the leader presses Go on the rally. <b>Offset</b> is the delay after the first launch.</p>
+    <div id="table-warn" class="warn hidden"></div>
+    <div id="table-error" class="error hidden"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Schedule</h2>
+      <button type="button" class="chip" id="btn-copy">Copy for chat</button>
+    </div>
+    <pre id="schedule" class="schedule">Add rallies and a target time to see the schedule.</pre>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js" defer></script>
+<script src="/app.js" defer></script>
+</body>
+</html>
