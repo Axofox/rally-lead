@@ -158,6 +158,25 @@ input.bad { border-color: var(--bad); }
 .chip:active { background: var(--border); }
 .chip:disabled { opacity: 0.5; cursor: default; }
 .chip-quiet { color: var(--muted); }
+.chip-danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+.chip-danger:hover { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--bg)); }
+.add-row {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.add-row:hover { border-color: var(--link); background: var(--bg); }
+.add-row + .hint { margin-top: 10px; }
 .chip svg { display: block; }
 .link-btn {
   border: none; background: none; padding: 0; color: var(--link);
