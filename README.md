@@ -47,8 +47,11 @@ npm install
 ```
 
 This stamps a build version into `index.html` (shown in the page footer and used to
-cache-bust `app.js` / `style.css`) and runs `netlify deploy --prod`. If a phone shows an
-old footer version after a deploy, close the tab completely and reopen it.
+cache-bust `app.js` / `style.css`) and runs `netlify deploy --prod`. The site
+(https://rallyawu.netlify.app) is also connected to GitHub, so a plain `git push` to
+`main` deploys as well — run `./deploy.sh` before committing so the build stamp in
+`index.html` is fresh. If a phone shows an old footer version after a deploy, close the
+tab completely and reopen it.
 
 No environment variables are needed — the site has no write endpoints, so there is no
 `ADMIN_TOKEN` gate.
