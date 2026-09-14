@@ -1,0 +1,13 @@
+{
+  "name": "rally-timing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kingshot rally launch-time scheduler. Static site, no build step.",
+  "scripts": {
+    "deploy": "./deploy.sh",
+    "serve": "npx -y serve -l 8765 public"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}

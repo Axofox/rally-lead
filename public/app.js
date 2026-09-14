@@ -73,7 +73,15 @@
     if (m && (m[1] || m[2] || m[3])) {
       return (+(m[1] || 0)) * 3600 + (+(m[2] || 0)) * 60 + (+(m[3] || 0));
     }
-    if (/^\d+$/.test(s)) return +s; // plain seconds
+    // Bare digits, keypad style: 1-2 digits = minutes, 3-4 = m:ss / mm:ss, 5-6 = h:mm:ss.
+    if (/^\d{1,6}$/.test(s)) {
+      if (s.length <= 2) return (+s) * 60;
+      var sec = +s.slice(-2), rest = s.slice(0, -2);
+      if (sec > 59) return null;
+      if (rest.length <= 2) return (+rest) * 60 + sec;
+      var min = +rest.slice(-2), hrs = +rest.slice(0, -2);
+      return min > 59 ? null : hrs * 3600 + min * 60 + sec;
+    }
     return null;
   }
 
@@ -207,7 +215,7 @@
     });
     els.target.classList.toggle('bad', state.target.trim() !== '' && !parseClock(state.target));
     els.tableError.classList.toggle('hidden', !badMarch);
-    if (badMarch) els.tableError.textContent = 'A march time could not be read. Use mm:ss, hh:mm:ss or e.g. 4m 32s.';
+    if (badMarch) els.tableError.textContent = 'A march time could not be read. Type 105 for 1:05, 4 for 4:00, or mm:ss.';
     updatePastWarning(c, now);
     renderSchedule(c);
   }
@@ -267,6 +275,13 @@
     if (!r) return;
     r[inp.dataset.field] = inp.value;
     save(); renderComputed();
+  });
+  els.body.addEventListener('focusout', function (e) {
+    var inp = e.target.closest('input[data-field="march"]');
+    if (!inp) return;
+    var r = rowById(inp.closest('tr').dataset.id);
+    var secs = parseDuration(inp.value);
+    if (r && secs !== null && secs > 0) { r.march = canonicalDuration(secs); inp.value = r.march; save(); renderComputed(); }
   });
   els.body.addEventListener('keydown', function (e) {
     // Enter in the last row's march field adds a new rally.
@@ -576,7 +591,7 @@
   // 4m 32s / 1min / 1 min 30 / 90s, a bare number on its own line (= minutes), and
   // the usual OCR slips (O for 0, l/I for 1, ; or . for :).
   var TIME_RE = /(?:^|[^\d:])((?:[0-9OoIl]{1,2}\s?[:;.]\s?)?[0-9OoIl]{1,2}\s?[:;.]\s?[0-9OoIl]{2}|\d{1,2}\s*h(?:ours?|rs?)?\s*(?:\d{1,2}\s*m(?:in(?:ute)?s?)?)?\s*(?:\d{1,2}\s*s(?:ec(?:ond)?s?)?)?|\d{1,2}\s*m(?:in(?:ute)?s?)?(?:\s*(?:and\s*)?\d{1,2}\s*s?(?:ec(?:ond)?s?)?)?|\d{1,3}\s*s(?:ec(?:ond)?s?)?)(?![\d:a-z])/gi;
-  var BARE_NUMBER_RE = /^\s*(\d{1,2})(?:[.,](\d))?\s*$/;
+  var BARE_NUMBER_RE = /^\s*(\d{1,6})(?:[.,](\d))?\s*$/;
   function fixDigits(s) { return s.replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/[;.]/g, ':').replace(/\s*:\s*/g, ':'); }
 
   // "4m32s", "1min", "1 min 30", "90s", "1h 5m" -> seconds
@@ -610,8 +625,8 @@
       // A bubble that is just "1" or "1.5" means minutes.
       var bare = line.match(BARE_NUMBER_RE);
       if (!p.times.length && bare) {
-        var secs = (+bare[1]) * 60 + (bare[2] ? Math.round((+bare[2]) * 6) : 0);
-        if (secs > 0) p.times.push({ raw: line, index: 0, end: line.length, secs: secs });
+        var secs = bare[2] ? (+bare[1]) * 60 + Math.round((+bare[2]) * 6) : parseDuration(bare[1]);
+        if (secs !== null && secs > 0) p.times.push({ raw: line, index: 0, end: line.length, secs: secs });
       }
     });
 

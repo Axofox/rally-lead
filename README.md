@@ -39,6 +39,10 @@ npx -y serve -l 8765 public
 ## Deploy
 
 ```bash
+npm install
+```
+
+```bash
 ./deploy.sh
 ```
 
