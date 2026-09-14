@@ -155,6 +155,13 @@
     els.gap.value = state.gap;
   }
 
+  // Touch devices get the native time wheel for the march (no keyboard, no zoom);
+  // desktop keeps a typed field.
+  var touchUI = window.matchMedia('(pointer: coarse)').matches;
+  function toHMS(secs) {
+    var h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), sec = secs % 60;
+    return pad(h) + ':' + pad(m) + ':' + pad(sec);
+  }
   function renderRows() {
     els.body.innerHTML = '';
     if (!state.rallies.length) {
@@ -170,7 +177,9 @@
       tr.innerHTML =
         '<td class="col-order">' + (i + 1) + '</td>' +
         '<td class="name-cell"><input type="text" data-field="name" placeholder="Leader ' + (i + 1) + '" autocomplete="off" spellcheck="false"></td>' +
-        '<td class="march-cell"><input type="text" data-field="march" inputmode="numeric" autocomplete="off" spellcheck="false"></td>' +
+        (touchUI
+          ? '<td class="march-cell"><input type="time" step="1" data-field="march"></td>'
+          : '<td class="march-cell"><input type="text" data-field="march" inputmode="numeric" autocomplete="off" spellcheck="false"></td>') +
         '<td class="col-num launch">—</td>' +
         '<td class="col-num col-hit hit">—</td>' +
         '<td class="col-tools">' +
@@ -179,7 +188,9 @@
           '<button type="button" class="icon-btn danger" data-act="del" title="Remove">✕</button>' +
         '</td>';
       tr.querySelector('[data-field="name"]').value = r.name;
-      tr.querySelector('[data-field="march"]').value = r.march;
+      var marchInput = tr.querySelector('[data-field="march"]');
+      if (touchUI) { var secs = parseDuration(r.march); marchInput.value = secs !== null && secs > 0 ? toHMS(secs) : ''; }
+      else marchInput.value = r.march;
       els.body.appendChild(tr);
     });
     renderComputed();
@@ -273,12 +284,15 @@
     if (!inp) return;
     var r = rowById(inp.closest('tr').dataset.id);
     if (!r) return;
-    r[inp.dataset.field] = inp.value;
+    if (inp.type === 'time') {
+      var secs = parseDuration(inp.value);
+      r.march = secs !== null && secs > 0 ? canonicalDuration(secs) : '';
+    } else r[inp.dataset.field] = inp.value;
     save(); renderComputed();
   });
   els.body.addEventListener('focusout', function (e) {
     var inp = e.target.closest('input[data-field="march"]');
-    if (!inp) return;
+    if (!inp || inp.type !== 'text') return;
     var r = rowById(inp.closest('tr').dataset.id);
     var secs = parseDuration(inp.value);
     if (r && secs !== null && secs > 0) { r.march = canonicalDuration(secs); inp.value = r.march; save(); renderComputed(); }

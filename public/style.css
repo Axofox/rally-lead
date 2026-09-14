@@ -240,6 +240,27 @@ input.bad { border-color: var(--bad); }
 .rally-table td.name-cell { min-width: 120px; }
 .rally-table td.march-cell { width: 120px; }
 .rally-table td.march-cell input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.rally-table td.launch { min-width: 84px; }
+.rally-table input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  min-width: 96px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.rally-table input[type="time"]::-webkit-date-and-time-value { text-align: left; min-height: 1.3em; }
+.rally-table input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+/* iOS zooms the page when it focuses an input under 16px; keep every field at 16px on touch. */
+@media (pointer: coarse) {
+  input[type="text"], input[type="number"], .rally-table input[type="text"] { font-size: 16px; }
+  .rally-table td.march-cell { width: auto; }
+}
 .rally-table .col-tools { width: 96px; text-align: right; }
 .icon-btn {
   width: 28px; height: 28px;
@@ -311,14 +332,26 @@ input.bad { border-color: var(--bad); }
 @media (max-width: 520px) {
   main { padding: 24px 14px 60px; }
   .card { padding: 14px 12px; }
-  /* Hits are in the schedule below; drop them so the row fits without scrolling. */
-  .rally-table .col-hit, .rally-table .col-order { display: none; }
-  .rally-table th, .rally-table td { padding: 6px 4px; }
-  .rally-table td.name-cell { min-width: 0; }
-  .rally-table .col-march, .rally-table td.march-cell { width: 58px; }
-  .rally-table td.march-cell input { padding: 6px 5px; }
-  .rally-table td.name-cell { width: auto; }
-  .wide-only { display: none; }
+  /* Phone layout: each rally is two lines — name, then march / launch / buttons. */
+  .rally-table thead { display: none; }
+  .rally-table, .rally-table tbody { display: block; }
+  .rally-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px 8px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rally-table tbody tr:last-child { border-bottom: none; }
+  .rally-table td { display: block; padding: 0; border: none; white-space: nowrap; }
+  .rally-table td.col-order, .rally-table td.col-hit { display: none; }
+  .rally-table td.name-cell { grid-column: 1 / -1; min-width: 0; width: auto; }
+  .rally-table td.march-cell { width: auto; }
+  .rally-table td.launch { text-align: right; font-size: 16px; min-width: 0; }
+  .rally-table td.col-tools { width: auto; text-align: right; }
+  .rally-table .empty-row td { grid-column: 1 / -1; text-align: center; }
+  .icon-btn { width: 32px; height: 32px; }
   .rally-table .col-tools { width: 84px; }
   .icon-btn { width: 26px; height: 26px; }
   .schedule { font-size: 12.5px; }
